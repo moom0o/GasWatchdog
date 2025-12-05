@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wesco Network Stock Tracker</title>
+    <style>
+        body { margin: 0; background-color: #1e1e1e; font-family: sans-serif; }
+        #container { height: 100vh; width: 100vw; }
+    </style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/modules/heatmap.js"></script>
+<script src="https://code.highcharts.com/modules/accessibility.js"></script>
+
+<script>
+    async function loadChart() {
+        // Fetch Data from your Node.js endpoint
+        const response = await fetch('/data'); // Points to your Forward-Filled endpoint
+        const rawData = await response.json();
+
+        // --- STEP 1: PREPARE DATA ---
+        const stations = [...new Set(rawData.map(item => item.name))].sort();
+
+        // Main Heatmap Data: [Time, StationIndex, Price]
+        const heatmapData = [];
+
+        // Navigator Data: [Time, AveragePrice] (Key / Value map first to aggregate)
+        const timeMap = {};
+
+        rawData.forEach(item => {
+            if (item.reg !== null) {
+                // 1. Build Heatmap Point
+                heatmapData.push([
+                    item.time,
+                    stations.indexOf(item.name),
+                    item.reg
+                ]);
+
+                // 2. Aggregate for Average (Navigator)
+                if (!timeMap[item.time]) {
+                    timeMap[item.time] = { sum: 0, count: 0 };
+                }
+                timeMap[item.time].sum += item.reg;
+                timeMap[item.time].count++;
+            }
+        });
+
+        // Convert TimeMap to array for the Navigator Series
+        // Format: [Time, AveragePrice]
+        const navigatorData = Object.keys(timeMap)
+            .sort((a, b) => a - b)
+            .map(time => [
+                parseInt(time),
+                timeMap[time].sum / timeMap[time].count
+            ]);
+
+        // Calculate Min/Max for Color Scaling
+        const prices = heatmapData.map(p => p[2]);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+
+        // --- STEP 2: CONFIGURE HIGHSTOCK ---
+        // notice: Highcharts.stockChart instead of Highcharts.chart
+        Highcharts.stockChart('container', {
+            time: {
+                timezone: 'America/New_York'
+            },
+            chart: {
+                backgroundColor: '#1e1e1e',
+                marginTop: 50,
+                events: {
+                    load: function() {
+                        // Fix: Ensure Y-Axis categories render correctly in Stock mode
+                        this.yAxis[0].update({
+                            categories: stations,
+                            max: stations.length - 1
+                        });
+                    }
+                }
+            },
+
+            // --- THE TIME SELECTOR (ZOOM BUTTONS) ---
+            rangeSelector: {
+                enabled: true,
+                selected: 1, // Default to "24h" (Index 1)
+                buttons: [
+                    { type: 'day', count: 1, text: '24h' }, // This matches your screenshots
+                    { type: 'week', count: 1, text: '7d' },
+                    { type: 'month', count: 1, text: '30d' },
+                    { type: 'all', text: 'All' }
+                ],
+                buttonTheme: {
+                    fill: '#333',
+                    stroke: 'none',
+                    'stroke-width': 0,
+                    r: 8,
+                    style: { color: '#CCC', fontWeight: 'bold' },
+                    states: { hover: { fill: '#444' }, select: { fill: '#3060cf', style: { color: 'white' } } }
+                },
+                labelStyle: { color: '#CCC' },
+                inputEnabled: false // Hide the Date Input boxes to save space
+            },
+
+            title: { text: 'Wesco Network Price Tracker', style: { color: '#FFF' } },
+
+            yAxis: {
+                labels: { style: { color: '#BBB', fontSize: '10px' } },
+                reversed: true,
+                gridLineWidth: 0,
+                startOnTick: false,
+                endOnTick: false
+            },
+
+            colorAxis: {
+                min: minPrice,
+                max: maxPrice,
+                stops: [
+                    [0, '#00FF00'], // Low
+                    [0.5, '#FFFF00'],
+                    [1, '#FF0000']  // High
+                ],
+                labels: { style: { color: '#FFF' } }
+            },
+
+            // --- THE NAVIGATOR (BOTTOM SLIDER) ---
+            navigator: {
+                enabled: true,
+                height: 60,
+                margin: 10,
+                maskFill: 'rgba(48, 96, 207, 0.3)', // Cool blue selection area
+                series: {
+                    color: '#CCC',
+                    lineWidth: 1
+                },
+                xAxis: { labels: { style: { color: '#CCC' } } }
+            },
+
+            series: [
+                {
+                    // SERIES 1: The Heatmap (Main Chart)
+                    type: 'heatmap',
+                    name: 'Gas Prices',
+                    data: heatmapData,
+                    colsize: 5 * 60 * 1000, // 15 Min blocks
+                    tooltip: {
+                        pointFormat: '{point.x:%H:%M}: <b>${point.value}</b>',
+                        valueDecimals: 2, // Changed to 2 so you see cents (e.g. $2.64) instead of rounding
+                        split: true
+                    },
+                    // Important: Don't show the heatmap in the navigator (it looks messy)
+                    showInNavigator: false
+                },
+                {
+                    // SERIES 2: The Average Line (Hidden in Main, Shown in Navigator)
+                    type: 'line',
+                    name: 'Avg Network Price',
+                    data: navigatorData,
+                    visible: false, // Hide from the main chart area
+                    showInNavigator: true // ONLY show in the bottom slider
+                }
+            ]
+        });
+    }
+
+    loadChart();
+</script>
+
+</body>
+</html>
