@@ -1,0 +1,12 @@
+{
+  "webhook": "https://discord.com/api/webhooks/X",
+  "discordPingID": "528811409404854273",
+  "ip": "127.0.0.1",
+  "port": 3069,
+  "device_uid": "92c4b821a0f9e3d5",
+  "platform_id": "119",
+  "build": "50003",
+  "version": "42.01.01",
+  "device_type": "Pixel 6 Pro",
+  "gmt_offset": "-0500"
+}
