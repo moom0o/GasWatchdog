@@ -1,9 +1,55 @@
 # GasWatchdog
-Fill up your car at the lowest possible price in Michigan and beat the Edgeworth Price Cycle!
+![NodeJS](https://img.shields.io/badge/Node.js-Automation_Script-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-Data_Persistence-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Unirest](https://img.shields.io/badge/Unirest-HTTP_Client-E34F26?style=for-the-badge&logo=npm&logoColor=white)
 
-<img width="425" height="278" alt="image" src="https://github.com/user-attachments/assets/d5479e2a-8606-4d27-9561-283600c777c8" />
-<img width="540" height="239" alt="Screenshot_20251208-152926" src="https://github.com/user-attachments/assets/5e9aebab-dc4b-410b-ad74-5961015d2c70" />
-<img width="1164" height="432" alt="image" src="https://github.com/user-attachments/assets/f075850d-b324-4dd7-b18c-a99353bef3cc" />
+Fill up your car at the lowest possible price in Michigan and beat the Edgeworth Price Cycle by recieving notifications when prices are about to skyrocket!
+<img width="425" height="278" alt="image" src="im1.png" />
+<img width="540" height="239" alt="Screenshot_20251208-152926" src="im2.png" />
+
+## API Requests
+Implemented an automatic token rotation system. If the API returns a 403 Forbidden, the script intercepts the error, hits the /refreshToken endpoint using the device fingerprint, updates the in-memory session, and retries the original request without crashing.
+
+```mermaid
+graph TD
+    %% --- Trigger ---
+    Start((Cron Timer)) -->|Every 5m| LoadState[Load Previous Prices]
+    LoadState --> ApiReq[POST /map/list]
+
+    subgraph "Authentication System"
+    ApiReq --> Status{Status Code?}
+    
+    Status --403 Forbidden--> Refresh[POST /refreshToken]
+    Refresh -->|Using Device/Build ID| SaveToken[Update Token in RAM]
+    SaveToken -->|Retry Request| ApiReq
+    end
+
+    %% --- Section 2: Data Processing ---
+    Status --200 OK--> Transact[Begin SQLite Transaction]
+    Transact --> Iterate[Iterate Stations]
+
+    subgraph "Change Detection"
+    Iterate --> Compare{Price Changed?}
+    
+    %% The Optimization: Skip DB if no change
+    Compare --No (Skip)--> Next
+    
+    %% The Update Path
+    Compare --Yes--> DeltaCheck{Delta > $0.10?}
+    
+    DeltaCheck --Yes--> Ping[Webhook: Ping]
+    DeltaCheck --No--> Silent[Webhook: Standard Alert]
+    
+    Ping & Silent --> Insert[Stage DB Update]
+    Insert --> Next{More Stations?}
+    end
+
+    %% --- Section 3: Persistence ---
+    Next --Yes--> Iterate
+    Next --No--> Commit[Commit Transaction]
+    Commit --> Sleep([Wait for Next Cycle])
+```
+<img width="1164" height="432" alt="image" src="im3.png" />
 
 Fetch Wesco API to detect gas price increases in Michigan since they love to increase by 50 cents or more overnight due to midwest price cycling
 
