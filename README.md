@@ -4,6 +4,7 @@
 ![Unirest](https://img.shields.io/badge/Unirest-HTTP_Client-E34F26?style=for-the-badge&logo=npm&logoColor=white)
 
 Fill up your car at the lowest possible price in Michigan and beat the Edgeworth Price Cycle by recieving notifications when prices are about to skyrocket!
+
 <img width="425" height="278" alt="image" src="im1.png" />
 <img width="540" height="239" alt="Screenshot_20251208-152926" src="im2.png" />
 
